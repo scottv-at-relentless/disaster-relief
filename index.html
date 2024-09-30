@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NC Flood Relief Map</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100%; }
+        .legend { background: white; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script>
+        const map = L.map('map').setView([35.7596, -79.0193], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML += '<h4>Resource Types</h4>';
+            div.innerHTML += '<i style="background: #ff0000"></i> Food<br>';
+            div.innerHTML += '<i style="background: #0000ff"></i> Shelter<br>';
+            div.innerHTML += '<i style="background: #00ff00"></i> Electricity<br>';
+            div.innerHTML += '<i style="background: #ffff00"></i> Cell/Internet<br>';
+            div.innerHTML += '<i style="background: #ff00ff"></i> Fuel<br>';
+            return div;
+        };
+        legend.addTo(map);
+
+        const resourceTypes = {
+            'Food': '#ff0000',
+            'Shelter': '#0000ff',
+            'Electricity': '#00ff00',
+            'Cell/Internet': '#ffff00',
+            'Fuel': '#ff00ff'
+        };
+
+        async function addMarker(e) {
+            const type = prompt("Enter resource type (Food, Shelter, Electricity, Cell/Internet, Fuel):");
+            if (type && type in resourceTypes) {
+                const marker = L.marker(e.latlng).addTo(map);
+                marker.bindPopup(type).openPopup();
+                
+                try {
+                    const response = await fetch('/.netlify/functions/addMarker', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            lat: e.latlng.lat,
+                            lng: e.latlng.lng,
+                            type: type
+                        }),
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    if (!response.ok) {
+                        throw new Error('Failed to add marker');
+                    }
+                } catch (error) {
+                    console.error('Error adding marker:', error);
+                    alert('Failed to add marker. Please try again.');
+                }
+            }
+        }
+
+        map.on('click', addMarker);
+
+        async function loadMarkers() {
+            try {
+                const response = await fetch('/.netlify/functions/getMarkers');
+                if (!response.ok) {
+                    throw new Error('Failed to load markers');
+                }
+                const markers = await response.json();
+                markers.forEach(marker => {
+                    L.marker([marker.lat, marker.lng])
+                        .addTo(map)
+                        .bindPopup(marker.type);
+                });
+            } catch (error) {
+                console.error('Error loading markers:', error);
+                alert('Failed to load markers. Please refresh the page.');
+            }
+        }
+
+        loadMarkers();
+    </script>
+</body>
+</html>
