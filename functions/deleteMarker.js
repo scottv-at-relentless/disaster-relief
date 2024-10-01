@@ -1,4 +1,4 @@
-// functions/getMarkers.js
+// functions/deleteMarker.js
 const admin = require('firebase-admin');
 
 if (!admin.apps.length) {
@@ -11,17 +11,15 @@ const db = admin.firestore();
 
 exports.handler = async function(event, context) {
   try {
-    const snapshot = await db.collection('markers').get();
-    const markers = [];
-    snapshot.forEach(doc => {
-      markers.push({ id: doc.id, ...doc.data() });
-    });
+    const { id } = JSON.parse(event.body);
+    
+    await db.collection('markers').doc(id).delete();
     
     return {
       statusCode: 200,
-      body: JSON.stringify(markers),
+      body: JSON.stringify({ message: "Marker deleted successfully" }),
     };
   } catch (error) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Failed to retrieve markers' }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Failed to delete marker' }) };
   }
 };

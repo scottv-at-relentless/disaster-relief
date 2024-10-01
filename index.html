@@ -10,6 +10,7 @@
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100%; }
         .legend { background: white; padding: 10px; border-radius: 5px; }
+        .delete-button { margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -42,12 +43,11 @@
             'Fuel': '#ff00ff'
         };
 
+        const markers = {};
+
         async function addMarker(e) {
             const type = prompt("Enter resource type (Food, Shelter, Electricity, Cell/Internet, Fuel):");
             if (type && type in resourceTypes) {
-                const marker = L.marker(e.latlng).addTo(map);
-                marker.bindPopup(type).openPopup();
-                
                 try {
                     const response = await fetch('/.netlify/functions/addMarker', {
                         method: 'POST',
@@ -61,6 +61,7 @@
                     if (!response.ok) {
                         throw new Error('Failed to add marker');
                     }
+                    loadMarkers();
                 } catch (error) {
                     console.error('Error adding marker:', error);
                     alert('Failed to add marker. Please try again.');
@@ -68,7 +69,34 @@
             }
         }
 
-        map.on('click', addMarker);
+        async function deleteMarker(id) {
+            try {
+                const response = await fetch('/.netlify/functions/deleteMarker', {
+                    method: 'POST',
+                    body: JSON.stringify({ id }),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to delete marker');
+                }
+                map.removeLayer(markers[id]);
+                delete markers[id];
+            } catch (error) {
+                console.error('Error deleting marker:', error);
+                alert('Failed to delete marker. Please try again.');
+            }
+        }
+
+        function createPopupContent(marker) {
+            const container = document.createElement('div');
+            container.innerHTML = `<b>${marker.type}</b>`;
+            const deleteButton = document.createElement('button');
+            deleteButton.innerText = 'Delete';
+            deleteButton.className = 'delete-button';
+            deleteButton.onclick = () => deleteMarker(marker.id);
+            container.appendChild(deleteButton);
+            return container;
+        }
 
         async function loadMarkers() {
             try {
@@ -76,11 +104,16 @@
                 if (!response.ok) {
                     throw new Error('Failed to load markers');
                 }
-                const markers = await response.json();
-                markers.forEach(marker => {
-                    L.marker([marker.lat, marker.lng])
-                        .addTo(map)
-                        .bindPopup(marker.type);
+                const data = await response.json();
+                
+                // Remove existing markers
+                Object.values(markers).forEach(marker => map.removeLayer(marker));
+                
+                // Add new markers
+                data.forEach(markerData => {
+                    const marker = L.marker([markerData.lat, markerData.lng]);
+                    marker.addTo(map).bindPopup(createPopupContent(markerData));
+                    markers[markerData.id] = marker;
                 });
             } catch (error) {
                 console.error('Error loading markers:', error);
@@ -88,6 +121,7 @@
             }
         }
 
+        map.on('click', addMarker);
         loadMarkers();
     </script>
 </body>
