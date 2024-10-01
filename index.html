@@ -11,6 +11,9 @@
         #map { height: 100vh; width: 100%; }
         .legend { background: white; padding: 10px; border-radius: 5px; }
         .delete-button { margin-top: 5px; }
+        .leaflet-popup-content-wrapper { padding: 10px; }
+        .leaflet-popup-content { margin: 0; }
+        .resource-select { margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -22,32 +25,63 @@
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
+        const resourceTypes = {
+            'Food': { emoji: '🍽️', color: '#ff0000' },
+            'Shelter': { emoji: '🏠', color: '#0000ff' },
+            'Electricity': { emoji: '⚡', color: '#00ff00' },
+            'Cell/Internet': { emoji: '📱', color: '#ffff00' },
+            'Fuel': { emoji: '⛽', color: '#ff00ff' }
+        };
+
         const legend = L.control({position: 'bottomright'});
         legend.onAdd = function (map) {
             const div = L.DomUtil.create('div', 'legend');
             div.innerHTML += '<h4>Resource Types</h4>';
-            div.innerHTML += '<i style="background: #ff0000"></i> Food<br>';
-            div.innerHTML += '<i style="background: #0000ff"></i> Shelter<br>';
-            div.innerHTML += '<i style="background: #00ff00"></i> Electricity<br>';
-            div.innerHTML += '<i style="background: #ffff00"></i> Cell/Internet<br>';
-            div.innerHTML += '<i style="background: #ff00ff"></i> Fuel<br>';
+            Object.entries(resourceTypes).forEach(([type, { emoji, color }]) => {
+                div.innerHTML += `<div><span style="color:${color}">${emoji}</span> ${type}</div>`;
+            });
             return div;
         };
         legend.addTo(map);
 
-        const resourceTypes = {
-            'Food': '#ff0000',
-            'Shelter': '#0000ff',
-            'Electricity': '#00ff00',
-            'Cell/Internet': '#ffff00',
-            'Fuel': '#ff00ff'
-        };
-
         const markers = {};
 
+        function createIcon(emoji) {
+            return L.divIcon({
+                html: `<div style="font-size: 24px;">${emoji}</div>`,
+                className: 'emoji-icon',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+        }
+
+        function createResourceSelect() {
+            const select = document.createElement('select');
+            select.className = 'resource-select';
+            Object.entries(resourceTypes).forEach(([type, { emoji }]) => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = `${emoji} ${type}`;
+                select.appendChild(option);
+            });
+            return select;
+        }
+
         async function addMarker(e) {
-            const type = prompt("Enter resource type (Food, Shelter, Electricity, Cell/Internet, Fuel):");
-            if (type && type in resourceTypes) {
+            const container = document.createElement('div');
+            const select = createResourceSelect();
+            const addButton = document.createElement('button');
+            addButton.textContent = 'Add Marker';
+            container.appendChild(select);
+            container.appendChild(addButton);
+
+            const popup = L.popup()
+                .setLatLng(e.latlng)
+                .setContent(container)
+                .openOn(map);
+
+            addButton.onclick = async () => {
+                const type = select.value;
                 try {
                     const response = await fetch('/.netlify/functions/addMarker', {
                         method: 'POST',
@@ -61,12 +95,13 @@
                     if (!response.ok) {
                         throw new Error('Failed to add marker');
                     }
+                    map.closePopup();
                     loadMarkers();
                 } catch (error) {
                     console.error('Error adding marker:', error);
                     alert('Failed to add marker. Please try again.');
                 }
-            }
+            };
         }
 
         async function deleteMarker(id) {
@@ -89,7 +124,7 @@
 
         function createPopupContent(marker) {
             const container = document.createElement('div');
-            container.innerHTML = `<b>${marker.type}</b>`;
+            container.innerHTML = `<b>${resourceTypes[marker.type].emoji} ${marker.type}</b>`;
             const deleteButton = document.createElement('button');
             deleteButton.innerText = 'Delete';
             deleteButton.className = 'delete-button';
@@ -111,7 +146,8 @@
                 
                 // Add new markers
                 data.forEach(markerData => {
-                    const marker = L.marker([markerData.lat, markerData.lng]);
+                    const icon = createIcon(resourceTypes[markerData.type].emoji);
+                    const marker = L.marker([markerData.lat, markerData.lng], {icon: icon});
                     marker.addTo(map).bindPopup(createPopupContent(markerData));
                     markers[markerData.id] = marker;
                 });
