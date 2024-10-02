@@ -89,7 +89,7 @@
             addButton.onclick = async () => {
                 const type = select.value;
                 try {
-                    const response = await fetch('/functions/addMarker', {
+                    const response = await fetch('/netlify/functions/addMarker', {
                         method: 'POST',
                         body: JSON.stringify({
                             lat: e.latlng.lat,
@@ -112,7 +112,7 @@
 
         async function deleteMarker(id) {
             try {
-                const response = await fetch('/functions/deleteMarker', {
+                const response = await fetch('/netlify/functions/deleteMarker', {
                     method: 'POST',
                     body: JSON.stringify({ id }),
                     headers: { 'Content-Type': 'application/json' }
@@ -141,7 +141,7 @@
 
         async function loadMarkers() {
             try {
-                const response = await fetch('/functions/getMarkers');
+                const response = await fetch('/netlify/functions/getMarkers');
                 if (!response.ok) {
                     throw new Error('Failed to load markers');
                 }
